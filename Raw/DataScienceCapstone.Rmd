@@ -1,0 +1,153 @@
+---
+title: "NLP coursework"
+author: "Jonathan Bourne"
+date: "Saturday, November 08, 2014"
+output: html_document
+---
+
+```{r}
+packages <- c("R.utils", "tm")
+lapply(packages, require, character.only = TRUE)
+```
+
+
+```{r}
+setwd("~/R/DataScienceCapstone")
+base <- getwd()
+setwd("./Data/Raw/final/en_US")
+#setwd("C:/Users/Jonno/Documents/R/DataScienceCapstone/Data/Raw/final/en_US")
+
+```
+
+
+
+```{r}
+dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), stringsAsFactors=FALSE)
+
+dataSets <- cbind(dataSets, totalLines = sapply(dataSets$files, countLines))
+
+# for (i in 1:3){
+# with(dataSets,(assign(names[i],readLines(files[i])))) #can lapply be used here?
+# }
+
+for (i in 1:nrow(dataSets)){
+(assign(dataSets$names[i],readLines(dataSets$files[i]))) #can lapply be used here?
+}
+
+dataSets <- cbind(dataSets,fileSize = sapply( dataSets$files, function(n) file.info(n)$size), objectSize = sapply( dataSets$names, function(n) object.size(eval(parse(text=n)))), longestString = sapply(dataSets$names, function(n) max(nchar(eval(parse(text=n))))))
+
+
+
+sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.01))
+
+
+sapply(dataSets$names,function(n) length(eval(parse(text=n))))
+
+for ( i in 1:nrow(dataSets)){
+  n <- eval(parse(text=dataSets$names[i]))[as.logical(sample[[i]])]
+  assign(paste(dataSets$names[i], "_sub", sep=""),n )
+
+}
+
+Q4
+love <-sum(grepl("love", blogs, ignore.case=TRUE))
+hate <-sum(grepl("hate", blogs, ignore.case=TRUE))
+love.case1 <-sum(grepl("love", blogs))
+love.case2 <-sum(grepl("(?i)love", blogs))
+love/hate
+
+Q5
+twitter[grep("biostats", twitter)]
+
+
+Q6
+unlikely <- "A computer once beat me at chess, but it was no match for me at kickboxing"
+twitter[grep(unlikely, twitter)]
+
+```
+
+
+```{r}
+wordtokens <- function(corpus) {
+  data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+  }
+```
+
+```{r}
+tokens_blogs <- wordtokens(blogs_sub)
+tokens_news <- wordtokens(news_sub)
+tokens_twitter <- wordtokens(twitter_sub)
+```
+
+
+Questions to consider
+
+What do the data look like? 
+  blocks of text randomly taken from the interenet
+Where do the data come from? 
+  either bogs, news reports or twitter
+Can you think of any other data sources that might help you in this project?
+  Project Guttenberg could be a source for open available text, although it might include unsual language
+What are the common steps in natural language processing?
+I dunno!
+What are some common issues in the analysis of text data?
+Profantiy filtering
+What is the relationship between NLP and the concepts you have learned in the Specialization?
+
+```{r}
+library(tm)
+library("RWeka")
+library(RWekajars)
+NGramTokenizer(source1, Weka_control(min = 1, max = 1))
+```
+
+
+```{r}
+library(RWeka)
+
+ txt <- "I don't know. Maybe they're getting too much sun. I think I'm going to cut them way back. I replied."
+NGramTokenizer(txt, Weka_control(min = 1, max = 1, delimiters = " \\r\\n\\t.,;:\"()?!"))
+AlphabeticTokenizer(news_sub)
+table(WordTokenizer(txt, control = NULL))
+
+news2 <- readLines("en_US.news2.txt")
+news2_sub <- news2[as.logical(sample[[2]])]
+news3_sub <- news[as.logical(rbinom(length(news), 1, 0.01))]
+
+tokens_news3 <- data.frame((table(WordTokenizer(tolower(news3_sub), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+
+
+tokens_news <- data.frame((table(WordTokenizer(tolower(news_sub), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+
+tokens_blogs <- data.frame((table(WordTokenizer(tolower(blogs_sub), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+
+tokens_twitter <- data.frame((table(WordTokenizer(tolower(twitter_sub), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+
+wordtokens <- function(corpus) {
+  data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+  }
+tokens_blogs <- wordtokens(blogs_sub)
+tokens_news <- wordtokens(news_sub)
+tokens_twitter <- wordtokens(twitter_sub)
+
+Ngramtoken <- function(corpus) {
+  data.frame((table(NGramTokenizer(corpus, Weka_control(min = 3, max = 3, delimiters = " \\r\\n\\t.,;:\"()?!"))))) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+  }
+  
+  ngram_news <- Ngramtoken(twitter_sub)
+```
+
