@@ -1,0 +1,118 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+
+```{r}
+docs <- c("This is a text.", "This another one.")
+vs <- VectorSource(docs)
+elem <- getElem(stepNext(vs))
+(result <- readPlain(elem, "en", "id1"))
+meta(result)
+
+```
+
+
+```{r}
+corps <- c("en_US.blogs.", "en_US.news.", "en_US.twitter.") 
+```
+
+```{r}
+
+groups <- ceiling(length(sub_corpus)/20000)
+
+group_split <- sample(1:groups, length(sub_corpus), replace = TRUE)
+
+split_corpus <- lapply(1:groups, function(n) sub_corpus[group_split == n])
+
+corpus_Ngram2 <- Ngramiffier(split_corpus[[1]], Ngram = 2)
+
+corpus_Ngram2x <-lapply(split_corpus,function(n) Ngramiffier(n, Ngram = 2))
+
+xx <- do.call(cbind.data.frame, z3) #corpus_Ngram2
+xx2 <- group_by(xx, )
+```
+
+
+
+```{r}
+
+z2 <- lapply(split_corpus, function(n) { 
+  data.frame(table(NGramTokenizer(n, 
+                   Weka_control(min = 2, max = 2, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+        ),
+       stringsAsFactors = FALSE )
+        }
+  )
+
+xx <- do.call(rbind.data.frame, z2)
+
+xx <- group_by(xx, Var1)
+xx <- summarise(xx, Freq = sum(Freq))%>%
+  filter( Freq >50) %>%
+  ungroup %>%
+  arrange(-Freq)
+
+tab <- NGramTokenizer(split_corpus[[1]], 
+                   Weka_control(min = 2, max = 2, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+tab2<- table(tab)
+tab3 <- data.frame(tab2)
+
+
+
+```
+
+
+```{r}
+apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
+
+z2 <- lapply(split_corpus, function(n) { 
+  data.frame(table(NGramTokenizer(n, 
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+        ),
+       stringsAsFactors = FALSE )
+        }
+  )
+
+xx <- do.call(rbind.data.frame, z2)
+
+xx <- group_by(xx, Var1)
+xx <- summarise(xx, Freq = sum(Freq))%>%
+  filter( Freq > wordFreq) %>%
+  ungroup %>%
+  arrange(-Freq)}
+
+
+Ngram4 <- apply_ngram(split_corpus, 4)
+Ngram3 <- apply_ngram(split_corpus, 3)
+Ngram2 <- apply_ngram(split_corpus, 2)
+Ngram1 <- apply_ngram(split_corpus, 1)
+
+
+
+ngram_probs <- lapply(2:4, function(n) Ngram_probs(
+  eval(parse(text = paste("Ngram",n, sep=""))), 
+  eval(parse(text = paste("Ngram",n-1, sep=""))), 2))
+
+Ngram2_probs <- Ngram_probs(Ngram2, Ngram1, 20)
+
+
+pattern <- "and a case of"
+
+wordcount <- if(length(ngram_probs) < str_count(pattern, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(pattern, "\\S+")}
+
+forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
+
+results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+```
+

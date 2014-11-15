@@ -6,8 +6,8 @@ output: html_document
 ---
 
 ```{r}
-packages <- c("R.utils", "tm")
-lapply(packages, require, character.only = TRUE)
+packages <- c("R.utils", "tm", "RWeka", "dplyr", "stringr", "xtable")
+invisible(lapply(packages, require, character.only = TRUE))
 ```
 
 
@@ -15,33 +15,37 @@ lapply(packages, require, character.only = TRUE)
 setwd("~/R/DataScienceCapstone")
 base <- getwd()
 setwd("./Data/Raw/final/en_US")
-#setwd("C:/Users/Jonno/Documents/R/DataScienceCapstone/Data/Raw/final/en_US")
-
 ```
 
+
+things to consider removing all "-", expanding "n't" from both the data set and the data entry part.
 
 
 ```{r}
 dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), stringsAsFactors=FALSE)
 
 dataSets <- cbind(dataSets, totalLines = sapply(dataSets$files, countLines))
+```
 
-# for (i in 1:3){
-# with(dataSets,(assign(names[i],readLines(files[i])))) #can lapply be used here?
-# }
-
+import datasets and check file size
+```{r}
 for (i in 1:nrow(dataSets)){
 (assign(dataSets$names[i],readLines(dataSets$files[i]))) #can lapply be used here?
 }
 
-dataSets <- cbind(dataSets,fileSize = sapply( dataSets$files, function(n) file.info(n)$size), objectSize = sapply( dataSets$names, function(n) object.size(eval(parse(text=n)))), longestString = sapply(dataSets$names, function(n) max(nchar(eval(parse(text=n))))))
+dataSets <- cbind(dataSets,
+                  fileSize = sapply( dataSets$files, function(n) file.info(n)$size), 
+                  objectSize = sapply( dataSets$names, 
+                                       function(n) object.size(eval(parse(text=n)))), 
+                  longestString = sapply(dataSets$names, 
+                                         function(n) max(nchar(eval(parse(text=n))))))
+```
 
 
 
-sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.01))
-
-
-sapply(dataSets$names,function(n) length(eval(parse(text=n))))
+create sub samples and combined sub corpus
+```{r}
+sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.1))
 
 for ( i in 1:nrow(dataSets)){
   n <- eval(parse(text=dataSets$names[i]))[as.logical(sample[[i]])]
@@ -49,36 +53,110 @@ for ( i in 1:nrow(dataSets)){
 
 }
 
-Q4
-love <-sum(grepl("love", blogs, ignore.case=TRUE))
-hate <-sum(grepl("hate", blogs, ignore.case=TRUE))
-love.case1 <-sum(grepl("love", blogs))
-love.case2 <-sum(grepl("(?i)love", blogs))
-love/hate
-
-Q5
-twitter[grep("biostats", twitter)]
-
-
-Q6
-unlikely <- "A computer once beat me at chess, but it was no match for me at kickboxing"
-twitter[grep(unlikely, twitter)]
-
+sub_corpus <- tolower(c(blogs_sub, news_sub, twitter_sub))
 ```
 
-
+Quiz questions
 ```{r}
-wordtokens <- function(corpus) {
-  data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
+# Q4
+# love <-sum(grepl("love", blogs, ignore.case=TRUE))
+# hate <-sum(grepl("hate", blogs, ignore.case=TRUE))
+# love.case1 <-sum(grepl("love", blogs))
+# love.case2 <-sum(grepl("(?i)love", blogs))
+# love/hate
+# 
+# Q5
+# twitter[grep("biostats", twitter)]
+# 
+# 
+# Q6
+# unlikely <- "A computer once beat me at chess, but it was no match for me at kickboxing"
+# twitter[grep(unlikely, twitter)]
+```
+
+work tokenising
+```{r}
+# wordtokens <- function(corpus) {
+#   data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+#   }
+
+# tokens_blogs <- wordtokens(blogs_sub)
+# tokens_news <- wordtokens(news_sub)
+# tokens_twitter <- wordtokens(twitter_sub)
+```
+
+Ngram making
+```{r}
+Ngramiffier <- function(corpus, Ngram = 2 ) {
+  as.data.frame(table(
+    NGramTokenizer(corpus, 
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+    ),
+              stringsAsFactors = FALSE) %>%
   arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent), Ngrams = Ngram )
   }
+
+corpus_Ngram5 <- Ngramiffier(sub_corpus, Ngram = 5)
+corpus_Ngram4 <- Ngramiffier(sub_corpus, Ngram = 4)
+corpus_Ngram3 <- Ngramiffier(sub_corpus, Ngram = 3)
+corpus_Ngram2 <- Ngramiffier(sub_corpus, Ngram = 2)
+corpus_Ngram1 <- Ngramiffier(sub_corpus, Ngram = 1)
+
+corpus_names <- c("corpus_Ngram5","corpus_Ngram4", "corpus_Ngram3", "corpus_Ngram2", "corpus_Ngram1" )
+
 ```
 
+
+
 ```{r}
-tokens_blogs <- wordtokens(blogs_sub)
-tokens_news <- wordtokens(news_sub)
-tokens_twitter <- wordtokens(twitter_sub)
+# plot(corpus_Ngram2$cumPercent, corpus_Ngram2$Freq)
+# plot(corpus_Ngram2$cumPercent[1:60000] )
+# plot(corpus_Ngram2$cumPercent)
+# 
+# length(table(corpus_Ngram4$Freq))
+# plot((table(corpus_Ngram4$Freq)/length(corpus_Ngram4$Freq)))
+# 
+# rareCombos <- sapply(corpus_names ,function(n) sum(table(eval(parse(text=n))$Freq)[1:2]/length(eval(parse(text=n))$Freq)))
+# 
+# barplot(rareCombos) #the quantity of the ngram counts that are made up of single or double observations
+
+Ngram_probs <- function(Ngram_main, Ngram_sub, Freq_greater_than) {
+                Ngram_main <- filter(Ngram_main, Freq >Freq_greater_than)
+                Ngram_main <- cbind(Ngram_main, 
+                       dependent = word(Ngram_main$Var1, -1), 
+                       predictor = word(Ngram_main$Var1, 1,-2), 
+                       stringsAsFactors = FALSE)
+
+                Ngram_main <- merge(Ngram_main, 
+                           select(Ngram_sub, Var1, Freq), by.x ="predictor", by.y = "Var1") %>%
+                arrange(-Freq.x) %>%
+                rename( Freq= Freq.x, Prob = Freq.y ) %>%
+                mutate(Prob = Freq/Prob)%>%
+                group_by(predictor) %>%
+                filter(min_rank(desc(Prob)) == 1) 
+}
+
+
+ngram_probs <- lapply(2:5, function(n) Ngram_probs(
+  eval(parse(text = paste("corpus_Ngram",n, sep=""))), 
+  eval(parse(text = paste("corpus_Ngram",n-1, sep=""))), 2))
+
+pattern <- "and a case of"
+
+wordcount <- str_count(pattern, "\\S+")
+
+forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
+
+results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+
+
 ```
 
 
@@ -150,4 +228,3 @@ Ngramtoken <- function(corpus) {
   
   ngram_news <- Ngramtoken(twitter_sub)
 ```
-

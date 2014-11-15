@@ -1,0 +1,231 @@
+---
+title: "Milestone report for Data Science Capstone Project"
+author: "Jonathan Bourne"
+date: "Friday, November 14, 2014"
+output: html_document
+---
+
+#Introduction
+
+This is the milestone report in the Data Science Specialisation Capstone, the purpose of this report is to show the progress I have made so far in the project and the direction I am planning on taking
+
+THe git repsoitory for this project can be found at [here](https://github.com/JonnoB/DataScienceCapstone)
+
+
+
+```{r}
+packages <- c("R.utils", "tm", "RWeka", "dplyr", "stringr", "xtable", "knitr")
+invisible(lapply(packages, require, character.only = TRUE))
+```
+
+```{r}
+opts_chunk$set(eval=FALSE) #used for test purposes
+```
+
+
+
+```{r}
+# setwd("~/R/DataScienceCapstone")
+# base <- getwd()
+# setwd("./Data/Raw/final/en_US")
+# setwd("\\\\hk-fil-05\\users14$\\u35464\\R\\DataScienceCapstone\\Data\\Raw\\final\\en_US")
+```
+
+
+```{r}
+dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), stringsAsFactors=FALSE)
+
+dataSets <- cbind(dataSets, totalLines = sapply(dataSets$files, countLines))
+```
+
+import datasets and check file size
+```{r}
+for (i in 1:nrow(dataSets)){
+(assign(dataSets$names[i],readLines(dataSets$files[i]))) #can lapply be used here?
+}
+
+dataSets <- cbind(dataSets,
+                  fileSize = sapply( dataSets$files, function(n) file.info(n)$size), 
+                  objectSize = sapply( dataSets$names, 
+                                       function(n) object.size(eval(parse(text=n)))), 
+                  longestString = sapply(dataSets$names, 
+                                         function(n) max(nchar(eval(parse(text=n))))))
+```
+
+
+```{r}
+print(xtable(dataSets), type="html")
+```
+
+
+create sub samples and combined sub corpus
+```{r}
+sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.01))
+
+for ( i in 1:nrow(dataSets)){
+  n <- eval(parse(text=dataSets$names[i]))[as.logical(sample[[i]])]
+  assign(paste(dataSets$names[i], "_sub", sep=""),n )
+
+}
+
+sub_corpus <- tolower(c(blogs_sub, news_sub, twitter_sub))
+```
+
+
+
+Ngram making
+
+Ngrams are the combinations of N words which can be found in the corpus, the Number og combinations increases as the N number rises ergo there are many more 3gram combinations (all combinations of three adjacent words), than 1gram combinations.
+
+The below function takes the corpus and creates a data frame of Ngram tokens (combinations of words) and shows how many times those tokens occured, how much as a percent of the  corpus they made up and how much in cumulative percent all the tokens up to that point are
+```{r}
+Ngramiffier <- function(corpus, Ngram = 2 ) {
+  as.data.frame(table(
+    NGramTokenizer(corpus, 
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+    ),
+              stringsAsFactors = FALSE) %>%
+  arrange( -Freq) %>%
+  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent), Ngrams = Ngram )
+  }
+
+corpus_names <- c("corpus_Ngram5","corpus_Ngram4", "corpus_Ngram3", "corpus_Ngram2", "corpus_Ngram1" )
+```
+
+
+```{r}
+corpus_Ngram5 <- Ngramiffier(sub_corpus, Ngram = 5)
+corpus_Ngram4 <- Ngramiffier(sub_corpus, Ngram = 4)
+corpus_Ngram3 <- Ngramiffier(sub_corpus, Ngram = 3)
+corpus_Ngram2 <- Ngramiffier(sub_corpus, Ngram = 2)
+corpus_Ngram1 <- Ngramiffier(sub_corpus, Ngram = 1)
+```
+
+```{r}
+head(corpus_Ngram3, 20)
+```
+
+
+
+##Looking at the Ngram structure
+
+As can be seen by the graphs below there are many combinations that only occure a few times and a few that occur many times. This is related to a phenomenon known as Zipf law, but has not been explored further during this topic.
+```{r}
+# plot(corpus_Ngram2$cumPercent, corpus_Ngram2$Freq) 
+# plot(corpus_Ngram2$cumPercent[1:60000] )
+```
+
+As can be seen combinations that occur only once make up a Startlingly large percentage of the total combination list.
+```{r}
+plot((table(corpus_Ngram4$Freq)/length(corpus_Ngram4$Freq)))
+```
+
+This table shows how much of a size reduction can be brought about by removing all combinations that occur only once
+```{r}
+rareCombos <- sapply(corpus_names ,function(n) sum(table(eval(parse(text=n))$Freq)[1:2]/length(eval(parse(text=n))$Freq)))
+```
+
+
+```{r, results='asis'}
+print(xtable(as.data.frame(rareCombos)), type="html")
+```
+
+A visual representation of the make up of rare combinations acorss the Ngram's. as would be expected the higher the Ngram the more of it can be dropped.
+```{r}
+barplot(rareCombos) #the quantity of the ngram counts that are made up of single or double observations
+```
+
+
+create a probability table of Ngrams
+
+keeping only the highest scoring word for each predictor word as this will be the one that will always be reccomended.
+```{r}
+Ngram_probs <- function(Ngram_main, Ngram_sub, Freq_greater_than) {
+                Ngram_main <- filter(Ngram_main, Freq >Freq_greater_than)
+                Ngram_main <- cbind(Ngram_main, 
+                       dependent = word(Ngram_main$Var1, -1), 
+                       predictor = word(Ngram_main$Var1, 1,-2), 
+                       stringsAsFactors = FALSE)
+
+                Ngram_main <- merge(Ngram_main, 
+                           select(Ngram_sub, Var1, Freq), by.x ="predictor", by.y = "Var1") %>%
+                arrange(-Freq.x) %>%
+                rename( Freq= Freq.x, Prob = Freq.y ) %>%
+                mutate(Prob = Freq/Prob)%>%
+                group_by(predictor) %>%
+                filter(min_rank(desc(Prob)) == 1) #keep only number 1 ranked combination
+}
+```
+
+
+
+```{r}
+ngram_probs <- lapply(2:5, function(n) Ngram_probs(
+  eval(parse(text = paste("corpus_Ngram",n, sep=""))), 
+  eval(parse(text = paste("corpus_Ngram",n-1, sep=""))), 2))
+
+pattern <- "and at the same"
+
+wordcount <- str_count(pattern, "\\S+")
+
+forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
+```
+
+
+For the above pattern of text The below code finds the approriate response from the different Ngrams and ranks them according to highest probablility with Ngram count being used as a tie breaker.
+```{r}
+results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+```
+
+```{r, results='asis'}
+print(xtable(as.data.frame(results)), type = "html")
+```
+
+
+#Current Problems
+
+Generally the code seems slow but I don't have anythign to bench mark against so it could be normal.
+
+A more specific problem is that the above code is perfectly fine for exploratory data analysis however it only samples 1% of the total corpus, when increasing this to 10% the java part of RWeka runs out of memory and return
+
+java.lang.OutOfMemoryError
+
+in order to get around this problem I have broken the corpus into chunks and used lapply to perform operation on each of the chunks before compiling the compressed code again.
+
+the code for doing this is as follows
+
+```{r, eval=FALSE}
+groups <- ceiling(length(sub_corpus)/20000) #limits length to 20K which should be managable
+
+group_split <- sample(1:groups, length(sub_corpus), replace = TRUE)
+
+split_corpus <- lapply(1:groups, function(n) sub_corpus[group_split == n])
+```
+
+creates a function to tokenize the chunks convert them into tables then recombine as dataframes
+```{r, eval=FALSE}
+apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
+
+z2 <- lapply(split_corpus, function(n) { 
+  data.frame(table(NGramTokenizer(n, 
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
+                   )
+        ),
+       stringsAsFactors = FALSE )
+        }
+  )
+
+xx <- do.call(rbind.data.frame, z2)
+
+xx <- group_by(xx, Var1)
+xx <- summarise(xx, Freq = sum(Freq))%>%
+  filter( Freq > wordFreq) %>%
+  ungroup %>%
+  arrange(-Freq)}
+```
+
+After these stages the rest of the calculation can be done as normal. This has been tested up to 10% of the corpus but is slow, I don't know how to find a better method. 
