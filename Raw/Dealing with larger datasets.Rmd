@@ -4,20 +4,49 @@ output: html_document
 ---
 
 
-
-```{r}
-docs <- c("This is a text.", "This another one.")
-vs <- VectorSource(docs)
-elem <- getElem(stepNext(vs))
-(result <- readPlain(elem, "en", "id1"))
-meta(result)
-
-```
-
-
 ```{r}
 corps <- c("en_US.blogs.", "en_US.news.", "en_US.twitter.") 
 ```
+
+
+Split data set in to 10% random blocks
+
+```{r}
+set.seed(1025)
+twitter_groups <- sample(1:10, size = length(twitter),replace = TRUE)
+news_groups <- sample(1:10, size = length(news),replace = TRUE)
+blogs_groups <- sample(1:10, size = length(blogs),replace = TRUE)
+
+twitter_splits <- lapply(1:10, function(n) twitter[twitter_groups == n])
+blogs_splits <- lapply(1:10, function(n) blogs[blogs_groups == n])
+news_splits <- lapply(1:10, function(n) news[news_groups == n])
+
+rm(twitter_groups,news_groups,blogs_groups)
+
+for (i in 1:10) {
+  groups <- ceiling(length(twitter_splits[[i]])/20000)
+  group_split <- sample(1:groups, length(twitter_splits[[i]]), replace = TRUE)
+  split_corpus <- lapply(1:groups, function(n) twitter_splits[[i]][group_split == n])
+  y <- apply_ngram(split_corpus, 3, wordFreq = 2)
+  x <- paste("twitter_temp_",i, sep="")
+  assign(x, y)
+}
+
+rm(list=ls(pattern="temp"))
+
+```
+
+
+```{r}
+  groups <- ceiling(length(twitter_splits[[1]])/20000)
+  group_split <- sample(1:groups, length(twitter_splits[[1]]), replace = TRUE)
+  split_corpus <- lapply(1:groups, function(n) twitter_splits[[1]][group_split == n])
+  y <- apply_ngram(split_corpus, 3, wordFreq = 2)
+  x <- paste("twitter_temp_",1, sep="")
+  assign(x, y)
+```
+
+
 
 ```{r}
 
@@ -27,45 +56,7 @@ group_split <- sample(1:groups, length(sub_corpus), replace = TRUE)
 
 split_corpus <- lapply(1:groups, function(n) sub_corpus[group_split == n])
 
-corpus_Ngram2 <- Ngramiffier(split_corpus[[1]], Ngram = 2)
-
-corpus_Ngram2x <-lapply(split_corpus,function(n) Ngramiffier(n, Ngram = 2))
-
-xx <- do.call(cbind.data.frame, z3) #corpus_Ngram2
-xx2 <- group_by(xx, )
 ```
-
-
-
-```{r}
-
-z2 <- lapply(split_corpus, function(n) { 
-  data.frame(table(NGramTokenizer(n, 
-                   Weka_control(min = 2, max = 2, delimiters = " \\r\\n\\t.,;:\"()?!")
-                   )
-        ),
-       stringsAsFactors = FALSE )
-        }
-  )
-
-xx <- do.call(rbind.data.frame, z2)
-
-xx <- group_by(xx, Var1)
-xx <- summarise(xx, Freq = sum(Freq))%>%
-  filter( Freq >50) %>%
-  ungroup %>%
-  arrange(-Freq)
-
-tab <- NGramTokenizer(split_corpus[[1]], 
-                   Weka_control(min = 2, max = 2, delimiters = " \\r\\n\\t.,;:\"()?!")
-                   )
-tab2<- table(tab)
-tab3 <- data.frame(tab2)
-
-
-
-```
-
 
 ```{r}
 apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
@@ -115,4 +106,3 @@ results <- do.call(rbind.data.frame, results)
 results <- ungroup(results) %>%
   arrange( desc(Prob), desc(Ngrams))
 ```
-
