@@ -3,96 +3,193 @@ title: "Untitled"
 output: html_document
 ---
 
-
 ```{r}
-corps <- c("en_US.blogs.", "en_US.news.", "en_US.twitter.") 
+options(java.parameters = "-Xmx2g")
+packages <- c("R.utils", "tm", "RWeka", "dplyr", "stringr", "xtable")
+invisible(lapply(packages, require, character.only = TRUE))
 ```
 
 
-Split data set in to 10% random blocks
+```{r}
+setwd("~/R/DataScienceCapstone")
+base <- getwd()
+setwd("./Data/Raw/final/en_US")
+```
 
+
+```{r}
+
+```
+
+
+Ngram function
+```{r}
+apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
+
+z2 <- lapply(split_corpus, function(n) { 
+  x <- as.data.frame(NGramTokenizer(n, 
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.%*$,;#'\\-:\"()?!")
+            ), stringsAsFactors = F)
+colnames(x) <- "pattern"
+  x <- group_by(x, pattern ) %>%
+  summarise(Freq = n())
+        }
+  )
+
+xx <-  rbind_all(z2)
+xx <- group_by(xx, pattern)
+xx <- summarise(xx, Freq = sum(Freq))%>%
+  filter( Freq > wordFreq) %>%
+  ungroup %>%
+  arrange(-Freq)}
+```
+
+
+for very large Ngram sets
+```{r}
+large_Ngram <- function(dataset, Ngram ,sections= 8) {
+  name <-deparse(substitute(dataset))
+  for (i in 1:sections) {
+  groups <- ceiling(length(dataset[[i]])/20000)
+  group_split <- sample(1:groups, length(dataset[[i]]), replace = TRUE)
+  split_corpus <- lapply(1:groups, function(n) dataset[[i]][group_split == n])
+  y <- apply_ngram(split_corpus, Ngram, wordFreq = 2)
+  x <- paste(name,"_temp_", i, sep="")
+  assign(x, y, pos = 1)
+}
+}
+```
+
+```{r}
+large_Ngram2 <- function(dataset, Ngram ,sections= 8) {
+
+  x <- lapply(dataset[1:sections], function(i) {
+          groups <- ceiling(length(i)/20000)
+          group_split <- sample(1:groups, length(i), replace = TRUE)
+          split_corpus <- lapply(1:groups, function(n) i[group_split == n])
+          y <- apply_ngram(split_corpus, Ngram, wordFreq = 2)
+
+          }
+        )
+  x <- rbind_all(x)
+  x <- group_by(x, pattern) %>%
+      summarise(Freq = sum(Freq)) %>%
+      filter(Freq > 20)
+  name <- deparse(substitute(dataset))
+  y <- paste(name,"_",Ngram, "gram", sep="")
+  assign(y, x, pos =1)  
+  
+}
+```
+
+
+create the probability table of the Ngrams
+```{r}
+Ngram_probs <- function(Ngram_main, Ngram_sub) {
+
+                Ngram_main <- cbind(Ngram_main, 
+                       dependent = word(Ngram_main$pattern, -1), 
+                       predictor = word(Ngram_main$pattern, 1,-2), 
+                       stringsAsFactors = FALSE)
+
+                Ngram_main <- merge(Ngram_main, 
+                          Ngram_sub, by.x ="predictor", by.y = "pattern") %>%
+                          arrange(-Freq.x) %>%
+                          rename( Freq= Freq.x, Prob = Freq.y, Ngrams = Ngrams.x ) %>%
+                          select(-Ngrams.y) %>%
+                          mutate(Prob = Freq/Prob)%>%
+                          group_by(predictor) %>%
+                          filter(min_rank(desc(Prob)) == 1) 
+}
+```
+
+
+
+```{r}
+
+```
+
+
+splitting up the entire data set
 ```{r}
 set.seed(1025)
 twitter_groups <- sample(1:10, size = length(twitter),replace = TRUE)
 news_groups <- sample(1:10, size = length(news),replace = TRUE)
 blogs_groups <- sample(1:10, size = length(blogs),replace = TRUE)
 
-twitter_splits <- lapply(1:10, function(n) twitter[twitter_groups == n])
-blogs_splits <- lapply(1:10, function(n) blogs[blogs_groups == n])
-news_splits <- lapply(1:10, function(n) news[news_groups == n])
+twitter <- lapply(1:10, function(n) twitter[twitter_groups == n])
+blogs <- lapply(1:10, function(n) blogs[blogs_groups == n])
+news <- lapply(1:10, function(n) news[news_groups == n])
 
 rm(twitter_groups,news_groups,blogs_groups)
+```
 
-for (i in 1:10) {
-  groups <- ceiling(length(twitter_splits[[i]])/20000)
-  group_split <- sample(1:groups, length(twitter_splits[[i]]), replace = TRUE)
-  split_corpus <- lapply(1:groups, function(n) twitter_splits[[i]][group_split == n])
-  y <- apply_ngram(split_corpus, 3, wordFreq = 2)
-  x <- paste("twitter_temp_",i, sep="")
-  assign(x, y)
-}
+Create Ngrams for the different sources
+```{r}
+large_Ngram2(twitter, 1, sections = 8)
+large_Ngram2(twitter, 2, sections = 8)
+large_Ngram2(twitter, 3, sections = 8)
+large_Ngram2(twitter, 4, sections = 8)
 
-rm(list=ls(pattern="temp"))
+large_Ngram2(blogs, 1, sections = 8)
+large_Ngram2(blogs, 2, sections = 8)
+large_Ngram2(blogs, 3, sections = 8)
+large_Ngram2(blogs, 4, sections = 8)
+
+large_Ngram2(news, 1, sections = 8)
+large_Ngram2(news, 2, sections = 8)
+large_Ngram2(news, 3, sections = 8)
+large_Ngram2(news, 4, sections = 8)
+```
+
+compile Ngrams
+```{r}
+Ngram1 <- rbind(twitter_1gram, news_1gram, blogs_1gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 1)
+Ngram2 <- rbind(twitter_2gram, news_2gram, blogs_2gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 2)
+Ngram3 <- rbind(twitter_3gram, news_3gram, blogs_3gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 3)
+Ngram4 <- rbind(twitter_4gram, news_4gram, blogs_4gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 4)
+
+```
+
+```{r}
+Ngram2_probs <- Ngram_probs(Ngram2, Ngram1)
+Ngram3_probs <- Ngram_probs(Ngram3, Ngram2)
+Ngram4_probs <- Ngram_probs(Ngram4, Ngram3)
 
 ```
 
 
 ```{r}
-  groups <- ceiling(length(twitter_splits[[1]])/20000)
-  group_split <- sample(1:groups, length(twitter_splits[[1]]), replace = TRUE)
-  split_corpus <- lapply(1:groups, function(n) twitter_splits[[1]][group_split == n])
-  y <- apply_ngram(split_corpus, 3, wordFreq = 2)
-  x <- paste("twitter_temp_",1, sep="")
-  assign(x, y)
+save(list=ls(pattern = "temp"), file = "news_temp.Rda"  )
+
+setwd(file.path(base, "Data/Raw"))
+
+save(list=ls(pattern = "temp"), file = "news_temp.Rda"  )
+
+rm(list = ls(pattern="temp"))
 ```
 
-
-
-```{r}
-
-groups <- ceiling(length(sub_corpus)/20000)
-
-group_split <- sample(1:groups, length(sub_corpus), replace = TRUE)
-
-split_corpus <- lapply(1:groups, function(n) sub_corpus[group_split == n])
-
-```
-
-```{r}
-apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
-
-z2 <- lapply(split_corpus, function(n) { 
-  data.frame(table(NGramTokenizer(n, 
-                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
-                   )
-        ),
-       stringsAsFactors = FALSE )
-        }
-  )
-
-xx <- do.call(rbind.data.frame, z2)
-
-xx <- group_by(xx, Var1)
-xx <- summarise(xx, Freq = sum(Freq))%>%
-  filter( Freq > wordFreq) %>%
-  ungroup %>%
-  arrange(-Freq)}
-
-
-Ngram4 <- apply_ngram(split_corpus, 4)
-Ngram3 <- apply_ngram(split_corpus, 3)
-Ngram2 <- apply_ngram(split_corpus, 2)
-Ngram1 <- apply_ngram(split_corpus, 1)
-
-
-
+creating the probability tables
+```{r, eval=FALSE}
 ngram_probs <- lapply(2:4, function(n) Ngram_probs(
   eval(parse(text = paste("Ngram",n, sep=""))), 
-  eval(parse(text = paste("Ngram",n-1, sep=""))), 2))
+  eval(parse(text = paste("Ngram",n-1, sep="")))
+  ))
 
 Ngram2_probs <- Ngram_probs(Ngram2, Ngram1, 20)
+```
 
 
+testing the Ngram model
+```{r}
 pattern <- "and a case of"
 
 wordcount <- if(length(ngram_probs) < str_count(pattern, "\\S+")) {
@@ -106,3 +203,76 @@ results <- do.call(rbind.data.frame, results)
 results <- ungroup(results) %>%
   arrange( desc(Prob), desc(Ngrams))
 ```
+
+
+
+The dplyr enhanced version that avoids the table function is faster. it is also much smaller as it doesn't have a huge list of factors only characters
+```{r}
+# twit <- twitter[1:2000]
+# group_split <- sample(1:10, length(twit), replace = TRUE)
+# split_corpus <- lapply(1:10, function(n) twit[group_split == n])
+# 
+# res <- microbenchmark(apply_ngram2(split_corpus, 2),apply_ngram(split_corpus, 2), times =1000)
+# save(res, file= "apply_ngram_bench.Rda")
+```
+
+replaced the origina apply_ngram
+```{r}
+# apply_ngram2 <- function(split_corpus, Ngram, wordFreq = 20) {
+# 
+# z2 <- lapply(split_corpus, function(n) { 
+#   x <- as.data.frame(NGramTokenizer(n, 
+#                    Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.%*$,;#'\\-:\"()?!")
+#             ), stringsAsFactors = F)
+# colnames(x) <- "pattern"
+#   x <- group_by(x, pattern ) %>%
+#   summarise(Freq = n())
+#         }
+#   )
+# 
+# xx <-  rbind_all(z2)
+# xx <- group_by(xx, pattern)
+# xx <- summarise(xx, Freq = sum(Freq))%>%
+#   filter( Freq > wordFreq) %>%
+#   ungroup %>%
+#   arrange(-Freq)}
+```
+
+```{r}
+
+#old out classed by the newer benchmark function
+# apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
+# 
+# z2 <- lapply(split_corpus, function(n) { 
+#   data.frame(table(NGramTokenizer(n, 
+#                    Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.,;:\"()?!")
+#                    )
+#         ),
+#        stringsAsFactors = FALSE )
+#         }
+#   )
+# 
+# xx <- do.call(rbind.data.frame, z2)
+# xx <- group_by(xx, Var1)
+# xx <- summarise(xx, Freq = sum(Freq))%>%
+#   filter( Freq > wordFreq) %>%
+#   ungroup %>%
+#   arrange(-Freq)}
+```
+
+This code chunk is only useful when the large Ngram function is not being used as the large Ngram function has this chunk built in.
+```{r, eval=FALSE}
+# groups <- ceiling(length(sub_corpus)/20000)
+# group_split <- sample(1:groups, length(sub_corpus), replace = TRUE)
+# split_corpus <- lapply(1:groups, function(n) sub_corpus[group_split == n])
+```
+
+
+application of the apply ngram function out side of large_nrgam
+```{r, eval=FALSE}
+# Ngram4 <- apply_ngram(split_corpus, 4)
+# Ngram3 <- apply_ngram(split_corpus, 3)
+# Ngram2 <- apply_ngram(split_corpus, 2)
+# Ngram1 <- apply_ngram(split_corpus, 1)
+```
+

@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r}
+options(java.parameters = "-Xmx2g")
 packages <- c("R.utils", "tm", "RWeka", "dplyr", "stringr", "xtable")
 invisible(lapply(packages, require, character.only = TRUE))
 ```
@@ -20,11 +21,15 @@ setwd("./Data/Raw/final/en_US")
 
 things to consider removing all "-", expanding "n't" from both the data set and the data entry part.
 
+sub "can't" for "cannot"
+
+then "n't" for " not".... another alternactive is to remove the negation entirely from the the text as it only reverses the meaning of the sentence nothing else
+
 
 ```{r}
 dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), stringsAsFactors=FALSE)
 
-dataSets <- cbind(dataSets, totalLines = sapply(dataSets$files, countLines))
+#dataSets <- cbind(dataSets, totalLines = sapply(dataSets$files, countLines))
 ```
 
 import datasets and check file size
@@ -45,7 +50,7 @@ dataSets <- cbind(dataSets,
 
 create sub samples and combined sub corpus
 ```{r}
-sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.1))
+sample <- sapply(dataSets$names, function(n) rbinom(length(eval(parse(text=n))), 1, 0.3))
 
 for ( i in 1:nrow(dataSets)){
   n <- eval(parse(text=dataSets$names[i]))[as.logical(sample[[i]])]
@@ -124,7 +129,7 @@ corpus_names <- c("corpus_Ngram5","corpus_Ngram4", "corpus_Ngram3", "corpus_Ngra
 # 
 # barplot(rareCombos) #the quantity of the ngram counts that are made up of single or double observations
 
-Ngram_probs <- function(Ngram_main, Ngram_sub, Freq_greater_than) {
+Ngram_probs <- function(Ngram_main, Ngram_sub, Freq_greater_than =20) {
                 Ngram_main <- filter(Ngram_main, Freq >Freq_greater_than)
                 Ngram_main <- cbind(Ngram_main, 
                        dependent = word(Ngram_main$Var1, -1), 
@@ -175,56 +180,56 @@ Profantiy filtering
 What is the relationship between NLP and the concepts you have learned in the Specialization?
 
 ```{r}
-library(tm)
-library("RWeka")
-library(RWekajars)
-NGramTokenizer(source1, Weka_control(min = 1, max = 1))
-```
-
-
-```{r}
-library(RWeka)
-
- txt <- "I don't know. Maybe they're getting too much sun. I think I'm going to cut them way back. I replied."
-NGramTokenizer(txt, Weka_control(min = 1, max = 1, delimiters = " \\r\\n\\t.,;:\"()?!"))
-AlphabeticTokenizer(news_sub)
-table(WordTokenizer(txt, control = NULL))
-
-news2 <- readLines("en_US.news2.txt")
-news2_sub <- news2[as.logical(sample[[2]])]
-news3_sub <- news[as.logical(rbinom(length(news), 1, 0.01))]
-
-tokens_news3 <- data.frame((table(WordTokenizer(tolower(news3_sub), control = NULL)))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-
-
-tokens_news <- data.frame((table(WordTokenizer(tolower(news_sub), control = NULL)))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-
-tokens_blogs <- data.frame((table(WordTokenizer(tolower(blogs_sub), control = NULL)))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-
-tokens_twitter <- data.frame((table(WordTokenizer(tolower(twitter_sub), control = NULL)))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-
-wordtokens <- function(corpus) {
-  data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-  }
-tokens_blogs <- wordtokens(blogs_sub)
-tokens_news <- wordtokens(news_sub)
-tokens_twitter <- wordtokens(twitter_sub)
-
-Ngramtoken <- function(corpus) {
-  data.frame((table(NGramTokenizer(corpus, Weka_control(min = 3, max = 3, delimiters = " \\r\\n\\t.,;:\"()?!"))))) %>%
-  arrange( -Freq) %>%
-  mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
-  }
-  
-  ngram_news <- Ngramtoken(twitter_sub)
+# library(tm)
+# library("RWeka")
+# library(RWekajars)
+# NGramTokenizer(source1, Weka_control(min = 1, max = 1))
+# ```
+# 
+# 
+# ```{r}
+# library(RWeka)
+# 
+#  txt <- "I don't know. Maybe they're getting too much sun. I think I'm going to cut them way back. I replied."
+# NGramTokenizer(txt, Weka_control(min = 1, max = 1, delimiters = " \\r\\n\\t.,;:\"()?!"))
+# AlphabeticTokenizer(news_sub)
+# table(WordTokenizer(txt, control = NULL))
+# 
+# news2 <- readLines("en_US.news2.txt")
+# news2_sub <- news2[as.logical(sample[[2]])]
+# news3_sub <- news[as.logical(rbinom(length(news), 1, 0.01))]
+# 
+# tokens_news3 <- data.frame((table(WordTokenizer(tolower(news3_sub), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+# 
+# 
+# tokens_news <- data.frame((table(WordTokenizer(tolower(news_sub), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+# 
+# tokens_blogs <- data.frame((table(WordTokenizer(tolower(blogs_sub), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+# 
+# tokens_twitter <- data.frame((table(WordTokenizer(tolower(twitter_sub), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+# 
+# wordtokens <- function(corpus) {
+#   data.frame((table(WordTokenizer(tolower(corpus), control = NULL)))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+#   }
+# tokens_blogs <- wordtokens(blogs_sub)
+# tokens_news <- wordtokens(news_sub)
+# tokens_twitter <- wordtokens(twitter_sub)
+# 
+# Ngramtoken <- function(corpus) {
+#   data.frame((table(NGramTokenizer(corpus, Weka_control(min = 3, max = 3, delimiters = " \\r\\n\\t.,;:\"()?!"))))) %>%
+#   arrange( -Freq) %>%
+#   mutate(percent = Freq/sum(Freq), cumPercent = cumsum(percent) )
+#   }
+#   
+#   ngram_news <- Ngramtoken(twitter_sub)
 ```
