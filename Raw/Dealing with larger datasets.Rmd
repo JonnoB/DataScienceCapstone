@@ -18,17 +18,78 @@ setwd("./Data/Raw/final/en_US")
 
 
 ```{r}
+dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), stringsAsFactors=FALSE)
+```
 
+```{r}
+for (i in 1:nrow(dataSets)){
+(assign(paste(dataSets$names[i],"_raw", sep=""),readLines(dataSets$files[i]))) 
+}
+
+dataSets <- cbind(dataSets,
+                  fileSize = sapply( dataSets$files, function(n) file.info(n)$size), 
+                  objectSize = sapply( dataSets$names, 
+                                       function(n) object.size(eval(parse(text=n)))), 
+                  longestString = sapply(dataSets$names, 
+                                         function(n) max(nchar(eval(parse(text=n))))))
+```
+
+
+```{r}
+corpus_clean<- function(x) {
+x <- tolower(x)
+x <- gsub("&", "and", x)
+x <- gsub("p m|p.m", "pm", x)
+x <- gsub("'ll", " will", x)
+x <- gsub("'d", " would", x)
+x <- gsub("'m", " am", x)
+x <- gsub("'ve", " have", x)
+x <- gsub("'re", " are", x)
+x <- gsub("can't|cannot|cant", "can not", x)
+x <- gsub("n't", " not", x)
+x <- gsub("'s", "", x)
+x <- removeNumbers(x)
+x <- removePunctuation(x)
+x <- gsub(" will", "''ll", x)
+x <- gsub(" would", "'d", x)
+x <- gsub(" am", "'m", x)
+x <- gsub(" have", "'ve", x)
+x <- gsub(" are", "'re", x)
+x <- gsub("cannot", "can't", x)
+x <- gsub(" not", "n't", x)
+x <- stripWhitespace(x)
+  }
+
+```
+
+```{r}
+corpus_clean_stop<- function(x) {
+x <- tolower(x)
+x <- gsub("&", "and", x)
+x <- gsub("p m|p.m", "pm", x)
+x <- gsub("'ll", " will", x)
+x <- gsub("'d", " would", x)
+x <- gsub("'m", " am", x)
+x <- gsub("'ve", " have", x)
+x <- gsub("'re", " are", x)
+x <- gsub("can't|cannot|cant", "can not", x)
+x <- gsub("n't", " not", x)
+x <- gsub("'s", "", x)
+x <- removeNumbers(x)
+x <- removePunctuation(x)
+x <- removeWords(x, stopwords("english"))
+x <- stripWhitespace(x)
+  }
 ```
 
 
 Ngram function
 ```{r}
-apply_ngram <- function(split_corpus, Ngram, wordFreq = 20) {
+apply_ngram <- function(split_corpus, Ngram, wordFreq = 5) {
 
 z2 <- lapply(split_corpus, function(n) { 
   x <- as.data.frame(NGramTokenizer(n, 
-                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.%*$,;#'\\-:\"()?!")
+                   Weka_control(min = Ngram, max = Ngram, delimiters = " \\r\\n\\t.%*$,;#\\-:\"()?!")
             ), stringsAsFactors = F)
 colnames(x) <- "pattern"
   x <- group_by(x, pattern ) %>%
@@ -47,20 +108,6 @@ xx <- summarise(xx, Freq = sum(Freq))%>%
 
 for very large Ngram sets
 ```{r}
-large_Ngram <- function(dataset, Ngram ,sections= 8) {
-  name <-deparse(substitute(dataset))
-  for (i in 1:sections) {
-  groups <- ceiling(length(dataset[[i]])/20000)
-  group_split <- sample(1:groups, length(dataset[[i]]), replace = TRUE)
-  split_corpus <- lapply(1:groups, function(n) dataset[[i]][group_split == n])
-  y <- apply_ngram(split_corpus, Ngram, wordFreq = 2)
-  x <- paste(name,"_temp_", i, sep="")
-  assign(x, y, pos = 1)
-}
-}
-```
-
-```{r}
 large_Ngram2 <- function(dataset, Ngram ,sections= 8) {
 
   x <- lapply(dataset[1:sections], function(i) {
@@ -73,8 +120,7 @@ large_Ngram2 <- function(dataset, Ngram ,sections= 8) {
         )
   x <- rbind_all(x)
   x <- group_by(x, pattern) %>%
-      summarise(Freq = sum(Freq)) %>%
-      filter(Freq > 20)
+      summarise(Freq = sum(Freq))
   name <- deparse(substitute(dataset))
   y <- paste(name,"_",Ngram, "gram", sep="")
   assign(y, x, pos =1)  
@@ -103,14 +149,19 @@ Ngram_probs <- function(Ngram_main, Ngram_sub) {
 }
 ```
 
-
-
+clean the data sets
 ```{r}
+news <- corpus_clean(news_raw)
+blogs <- corpus_clean(blogs_raw)
+twitter <- corpus_clean(twitter_raw)
+
+news_stop <- corpus_clean_stop(news_raw)
+blogs_stop <- corpus_clean_stop(blogs_raw)
+twitter_stop <- corpus_clean_stop(twitter_raw)
 
 ```
 
-
-splitting up the entire data set
+splitting up the datasets into 10% list form
 ```{r}
 set.seed(1025)
 twitter_groups <- sample(1:10, size = length(twitter),replace = TRUE)
@@ -118,8 +169,8 @@ news_groups <- sample(1:10, size = length(news),replace = TRUE)
 blogs_groups <- sample(1:10, size = length(blogs),replace = TRUE)
 
 twitter <- lapply(1:10, function(n) twitter[twitter_groups == n])
-blogs <- lapply(1:10, function(n) blogs[blogs_groups == n])
 news <- lapply(1:10, function(n) news[news_groups == n])
+blogs <- lapply(1:10, function(n) blogs[blogs_groups == n])
 
 rm(twitter_groups,news_groups,blogs_groups)
 ```
@@ -159,10 +210,62 @@ Ngram4 <- rbind(twitter_4gram, news_4gram, blogs_4gram)%>%
 
 ```
 
+
 ```{r}
-Ngram2_probs <- Ngram_probs(Ngram2, Ngram1)
-Ngram3_probs <- Ngram_probs(Ngram3, Ngram2)
-Ngram4_probs <- Ngram_probs(Ngram4, Ngram3)
+ngram_probs <- lapply(2:4, function(n) Ngram_probs(
+  eval(parse(text = paste("Ngram",n, sep=""))), 
+  eval(parse(text = paste("Ngram",n-1, sep="")))
+  ))
+```
+
+
+#The stopless version
+
+```{r}
+set.seed(1025)
+twitter_groups <- sample(1:10, size = length(twitter_stop),replace = TRUE)
+news_groups <- sample(1:10, size = length(news_stop),replace = TRUE)
+blogs_groups <- sample(1:10, size = length(blogs_stop),replace = TRUE)
+
+twitter_stop <- lapply(1:10, function(n) twitter_stop[twitter_groups == n])
+news_stop <- lapply(1:10, function(n) news_stop[news_groups == n])
+blogs_stop <- lapply(1:10, function(n) blogs_stop[blogs_groups == n])
+
+rm(twitter_groups,news_groups,blogs_groups)
+```
+
+Create Ngrams for the different sources
+```{r}
+large_Ngram2(twitter_stop, 1, sections = 8)
+large_Ngram2(twitter_stop, 2, sections = 8)
+large_Ngram2(twitter_stop, 3, sections = 8)
+large_Ngram2(twitter_stop, 4, sections = 8)
+
+large_Ngram2(blogs_stop, 1, sections = 8)
+large_Ngram2(blogs_stop, 2, sections = 8)
+large_Ngram2(blogs_stop, 3, sections = 8)
+large_Ngram2(blogs_stop, 4, sections = 8)
+
+large_Ngram2(news_stop, 1, sections = 8)
+large_Ngram2(news_stop, 2, sections = 8)
+large_Ngram2(news_stop, 3, sections = 8)
+large_Ngram2(news_stop, 4, sections = 8)
+```
+
+compile Ngrams
+```{r}
+Ngram1_stop <- rbind(twitter_stop_1gram, news_stop_1gram, blogs_stop_1gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 1)
+Ngram2_stop <- rbind(twitter_stop_2gram, news_stop_2gram, blogs_stop_2gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 2)
+Ngram3_stop <- rbind(twitter_stop_3gram, news_stop_3gram, blogs_stop_3gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 3)
+Ngram4_stop <- rbind(twitter_stop_4gram, news_stop_4gram, blogs_stop_4gram)%>%
+    group_by( pattern) %>%
+    summarise(Freq = sum(Freq), Ngrams = 4)
 
 ```
 
@@ -177,31 +280,42 @@ save(list=ls(pattern = "temp"), file = "news_temp.Rda"  )
 rm(list = ls(pattern="temp"))
 ```
 
+
+```{r}
+ngram_probs_stop <- lapply(2:4, function(n) Ngram_probs(
+  eval(parse(text = paste("Ngram",n,,"_stop",  sep=""))), 
+  eval(parse(text = paste("Ngram",n-1, "_stop", sep="")))
+  ))
+```
+
+
 creating the probability tables
 ```{r, eval=FALSE}
-ngram_probs <- lapply(2:4, function(n) Ngram_probs(
-  eval(parse(text = paste("Ngram",n, sep=""))), 
-  eval(parse(text = paste("Ngram",n-1, sep="")))
-  ))
-
-Ngram2_probs <- Ngram_probs(Ngram2, Ngram1, 20)
+#save(ngram_probs, file ="ngram_probs.Rda")
+# load("ngram_probs.Rda")
 ```
 
 
 testing the Ngram model
 ```{r}
-pattern <- "and a case of"
-
-wordcount <- if(length(ngram_probs) < str_count(pattern, "\\S+")) {
-  length(ngram_probs)
-  } else  {str_count(pattern, "\\S+")}
-
-forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
-
-results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
-results <- do.call(rbind.data.frame, results)
-results <- ungroup(results) %>%
-  arrange( desc(Prob), desc(Ngrams))
+# pattern <- "When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
+# 
+# pattern <- corpus_clean(pattern)
+# #x <-  removeWords(pattern, stopwords("english"))
+# #x <- stripWhitespace(x)
+# x <- str_trim(pattern, side = "both")
+# pattern <- x
+# 
+# wordcount <- if(length(ngram_probs) < str_count(pattern, "\\S+")) {
+#   length(ngram_probs)
+#   } else  {str_count(pattern, "\\S+")}
+# 
+# forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
+# 
+# results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
+# results <- do.call(rbind.data.frame, results)
+# results <- ungroup(results) %>%
+#   arrange( desc(Prob), desc(Ngrams))
 ```
 
 
