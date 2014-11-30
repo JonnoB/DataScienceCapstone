@@ -23,7 +23,7 @@ dataSets <- data.frame(names = c("blogs","news", "twitter"),files = c("en_US.blo
 
 ```{r}
 for (i in 1:nrow(dataSets)){
-(assign(paste(dataSets$names[i],"_raw", sep=""),readLines(dataSets$files[i]))) 
+(assign(paste(dataSets$names[i],"Raw", sep=""),readLines(dataSets$files[i]))) 
 }
 
 dataSets <- cbind(dataSets,
@@ -151,14 +151,9 @@ Ngram_probs <- function(Ngram_main, Ngram_sub) {
 
 clean the data sets
 ```{r}
-news <- corpus_clean(news_raw)
-blogs <- corpus_clean(blogs_raw)
-twitter <- corpus_clean(twitter_raw)
-
-news_stop <- corpus_clean_stop(news_raw)
-blogs_stop <- corpus_clean_stop(blogs_raw)
-twitter_stop <- corpus_clean_stop(twitter_raw)
-
+news <- corpus_clean(newsRaw)
+blogs <- corpus_clean(blogsRaw)
+twitter <- corpus_clean(twitterRaw)
 ```
 
 splitting up the datasets into 10% list form
@@ -219,7 +214,21 @@ ngram_probs <- lapply(2:4, function(n) Ngram_probs(
 ```
 
 
+```{r}
+save(ngram_probs, file ="ngram_probs.Rda")
+save(list=ls(pattern = "blogs_.*|twitter_.*|news_.*"), file = "data.Rda"  )
+rm(list = ls(pattern = "blogs_|twitter_|news_"))
+```
+
+
 #The stopless version
+
+```{r}
+news_stop <- corpus_clean_stop(newsRaw)
+blogs_stop <- corpus_clean_stop(blogsRaw)
+twitter_stop <- corpus_clean_stop(twitterRaw)
+```
+
 
 ```{r}
 set.seed(1025)
@@ -269,53 +278,57 @@ Ngram4_stop <- rbind(twitter_stop_4gram, news_stop_4gram, blogs_stop_4gram)%>%
 
 ```
 
-
-```{r}
-save(list=ls(pattern = "temp"), file = "news_temp.Rda"  )
-
-setwd(file.path(base, "Data/Raw"))
-
-save(list=ls(pattern = "temp"), file = "news_temp.Rda"  )
-
-rm(list = ls(pattern="temp"))
-```
-
-
 ```{r}
 ngram_probs_stop <- lapply(2:4, function(n) Ngram_probs(
-  eval(parse(text = paste("Ngram",n,,"_stop",  sep=""))), 
+  eval(parse(text = paste("Ngram",n,"_stop",  sep=""))), 
   eval(parse(text = paste("Ngram",n-1, "_stop", sep="")))
   ))
+
+```
+
+```{r}
+save(ngram_probs_stop, file ="ngram_probs_stop.Rda")
+save(list=ls(pattern = "blogs_.*|twitter_.*|news_.*"), file = "data_stop.Rda"  )
+rm(list = ls(pattern = "blogs_|twitter_|news_"))
 ```
 
 
 creating the probability tables
 ```{r, eval=FALSE}
 #save(ngram_probs, file ="ngram_probs.Rda")
-# load("ngram_probs.Rda")
+load("ngram_probs_with_stops.Rda")
+ngram_probs2 <-ngram_probs
+load("ngram_probs.Rda")
+
+ngram_probs <- ngram_probs2
 ```
 
 
 testing the Ngram model
-```{r}
-# pattern <- "When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
-# 
-# pattern <- corpus_clean(pattern)
-# #x <-  removeWords(pattern, stopwords("english"))
-# #x <- stripWhitespace(x)
-# x <- str_trim(pattern, side = "both")
-# pattern <- x
-# 
-# wordcount <- if(length(ngram_probs) < str_count(pattern, "\\S+")) {
-#   length(ngram_probs)
-#   } else  {str_count(pattern, "\\S+")}
-# 
-# forNgrams <- sapply(1:wordcount, function(n) word(pattern, -n, -1))
-# 
-# results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], predictor == forNgrams[[n]]))
-# results <- do.call(rbind.data.frame, results)
-# results <- ungroup(results) %>%
-#   arrange( desc(Prob), desc(Ngrams))
+```{r} 
+pattern <- "When you breathe, I want to be the air for"
+
+phrase <- corpus_clean(pattern)
+phrase_stop <- corpus_clean_stop(pattern)
+
+
+result <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "left")
+  
+  wordcount <- if(length(ngram_probs) < str_count(phrase, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(phrase, "\\S+")}
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n, -1))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results
+  }
+
+rbind(result(phrase_stop, ngram_probs_stop), result(phrase, ngram_probs))
 ```
 
 
