@@ -29,9 +29,19 @@ for (i in 1:nrow(dataSets)){
 dataSets <- cbind(dataSets,
                   fileSize = sapply( dataSets$files, function(n) file.info(n)$size), 
                   objectSize = sapply( dataSets$names, 
-                                       function(n) object.size(eval(parse(text=n)))), 
+                                       function(n) {
+                                         object.size(eval(parse(
+                                           text=paste(n, "Raw", sep="")
+                                           )
+                                           )
+                                           )
+                                         })
+                                       , 
                   longestString = sapply(dataSets$names, 
-                                         function(n) max(nchar(eval(parse(text=n))))))
+                                         function(n) {
+                                           max(nchar(eval(parse(
+                                             text=paste(n,"Raw", sep="")))))}
+                                         ))
 ```
 
 
@@ -85,7 +95,7 @@ x <- stripWhitespace(x)
 
 Ngram function
 ```{r}
-apply_ngram <- function(split_corpus, Ngram, wordFreq = 5) {
+apply_ngram <- function(split_corpus, Ngram, wordFreq = 0) {
 
 z2 <- lapply(split_corpus, function(n) { 
   x <- as.data.frame(NGramTokenizer(n, 
@@ -100,7 +110,7 @@ colnames(x) <- "pattern"
 xx <-  rbind_all(z2)
 xx <- group_by(xx, pattern)
 xx <- summarise(xx, Freq = sum(Freq))%>%
-  filter( Freq > wordFreq) %>%
+  filter( Freq >= wordFreq) %>%
   ungroup %>%
   arrange(-Freq)}
 ```
@@ -295,23 +305,11 @@ rm(list = ls(pattern = "blogs_|twitter_|news_"))
 
 creating the probability tables
 ```{r, eval=FALSE}
-#save(ngram_probs, file ="ngram_probs.Rda")
-load("ngram_probs_with_stops.Rda")
-ngram_probs2 <-ngram_probs
+load("ngram_probs_stop.Rda")
 load("ngram_probs.Rda")
-
-ngram_probs <- ngram_probs2
 ```
 
-
-testing the Ngram model
-```{r} 
-pattern <- "When you breathe, I want to be the air for"
-
-phrase <- corpus_clean(pattern)
-phrase_stop <- corpus_clean_stop(pattern)
-
-
+```{r}
 result <- function(phrase, ngram_probs) { 
   phrase <- str_trim(phrase, side = "left")
   
@@ -327,8 +325,19 @@ results <- ungroup(results) %>%
   arrange( desc(Prob), desc(Ngrams))
   results
   }
+```
+
+
+testing the Ngram model
+```{r} 
+pattern <- "for the first"
+
+phrase <- corpus_clean(pattern)
+phrase_stop <- corpus_clean_stop(pattern)
 
 rbind(result(phrase_stop, ngram_probs_stop), result(phrase, ngram_probs))
+result(phrase_stop, ngram_probs_stop)
+result(phrase, ngram_probs)
 ```
 
 

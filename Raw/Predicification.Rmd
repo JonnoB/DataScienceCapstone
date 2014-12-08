@@ -1,0 +1,96 @@
+---
+title: "Predictification"
+author: "Jonathan Bourne"
+date: "Monday, December 01, 2014"
+output: html_document
+runtime: shiny
+---
+
+```{r}
+packages <- c("R.utils", "tm", "dplyr", "stringr", "xtable")
+invisible(lapply(packages, require, character.only = TRUE))
+```
+
+```{r}
+setwd("~/R/DataScienceCapstone")
+base <- getwd()
+setwd("./Data/Raw/final/en_US")
+```
+
+```{r, eval=FALSE}
+load("ngram_probs_stop.Rda")
+load("ngram_probs.Rda")
+```
+
+
+```{r}
+corpus_clean<- function(x) {
+x <- tolower(x)
+x <- gsub("&", "and", x)
+x <- gsub("p m|p.m", "pm", x)
+x <- gsub("'ll", " will", x)
+x <- gsub("'d", " would", x)
+x <- gsub("'m", " am", x)
+x <- gsub("'ve", " have", x)
+x <- gsub("'re", " are", x)
+x <- gsub("can't|cannot|cant", "can not", x)
+x <- gsub("n't", " not", x)
+x <- gsub("'s", "", x)
+x <- removeNumbers(x)
+x <- removePunctuation(x)
+x <- gsub(" will", "''ll", x)
+x <- gsub(" would", "'d", x)
+x <- gsub(" am", "'m", x)
+x <- gsub(" have", "'ve", x)
+x <- gsub(" are", "'re", x)
+x <- gsub("cannot", "can't", x)
+x <- gsub(" not", "n't", x)
+x <- stripWhitespace(x)
+  }
+
+```
+
+```{r}
+corpus_clean_stop<- function(x) {
+x <- tolower(x)
+x <- gsub("&", "and", x)
+x <- gsub("p m|p.m", "pm", x)
+x <- gsub("'ll", " will", x)
+x <- gsub("'d", " would", x)
+x <- gsub("'m", " am", x)
+x <- gsub("'ve", " have", x)
+x <- gsub("'re", " are", x)
+x <- gsub("can't|cannot|cant", "can not", x)
+x <- gsub("n't", " not", x)
+x <- gsub("'s", "", x)
+x <- removeNumbers(x)
+x <- removePunctuation(x)
+x <- removeWords(x, stopwords("english"))
+x <- stripWhitespace(x)
+  }
+```
+
+```{r}
+textInput("Data_Entry", "The Predicificator", value = "Enter Phrase Here")
+```
+
+```{r}
+
+
+pattern <- input$Data_Entry
+
+phrase <- corpus_clean(pattern)
+phrase_stop <- corpus_clean_stop(pattern)
+
+rbind(result(phrase_stop, ngram_probs_stop), result(phrase, ngram_probs))
+x <- result(phrase_stop, ngram_probs_stop)
+result(phrase, ngram_probs)
+output$table1 <- renderTable({ 
+          x
+     })
+```
+
+```{r}
+tableOutput("table1")
+```
+
