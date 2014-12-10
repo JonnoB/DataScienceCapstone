@@ -8,7 +8,7 @@ runtime: shiny
 
 ```{r}
 packages <- c("R.utils", "tm", "dplyr", "stringr", "xtable")
-invisible(lapply(packages, require, character.only = TRUE))
+invisible(lapply(packages, library, character.only = TRUE))
 ```
 
 ```{r}

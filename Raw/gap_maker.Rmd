@@ -1,0 +1,119 @@
+---
+title: "Untitled"
+author: "Jonathan Bourne"
+date: "Monday, December 08, 2014"
+output: html_document
+---
+
+
+```{r}
+insert_blank <- function(x , words, row = 1){
+
+  t <- lapply(1:Ngram_case, function(n) {
+  if(words[row,n] =="[blank]"){rep("[blank]", nrow(x) )} else{word(x$predictor, n)}
+  })
+
+x$predictor <- do.call(paste, t)
+x$pattern <- paste(x$predictor ,x$dependent)
+
+x <- group_by(x, pattern)
+x <- summarise(x, predictor = predictor, 
+               Freq = sum(Freq), 
+               Ngrams = Ngram_case - sum(grepl("[blank]",words[row,]))+1, 
+               dependent = dependent)%>%
+      ungroup  %>%
+      arrange(-Freq)
+
+x <- group_by(x, predictor ) %>%
+      mutate( Prob = Freq/sum(Freq)) %>%
+      filter(min_rank(desc(Prob)) == 1) }
+```
+
+
+
+```{r}
+
+words <- data.frame(one = rep("x1",8), two = rep(c("x2","[blank]"), 1, each = 4), three = rep(c("x3","[blank]"), 2, each = 2), four = rep(c("x4","[blank]"), 4), stringsAsFactors = FALSE)
+
+x <- ngram_probs[[3]]
+ 
+Ngram_case <- mean(x$Ngrams)-1
+words <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
+
+
+x2 <- insert_blank(x, words, 4)
+
+
+x3 <- lapply(1:nrow(words), function(y) {
+    insert_blank(x, words, y)
+  
+})
+
+
+
+
+reduce2 <- sapply(1:30, function(n){
+  x2 <-x2[x2$Freq >=n,]
+  c(n,nrow(x2)/nrow(x),sum(x2$Freq)/sum(x$Freq))
+})  
+reduce2 <- data.frame(t(reduce2))
+
+```
+
+
+```{r}
+reduce3 <- lapply(x3, function(x){
+  reduce <- sapply(1:30, function(n){
+  x2 <-x[x$Freq >=n,]
+  c(n,nrow(x2)/nrow(x),sum(x2$Freq)/sum(x$Freq))
+})
+
+data.frame(t(reduce))
+})
+
+red <- rbind_all(reduce3)
+
+red <- cbind( red, rep(c(2,3,4,5), each = 30))
+names(red) <- c("cut_off","length_reduction", "Loss_of_information", "Ngram")
+red <-melt(data = red, id.vars =c("cut_off", "Ngram"))
+
+ggplot(red, aes( x= cut_off, y = value, colour = variable)) + geom_line()+facet_grid(~Ngram) +
+  ggtitle ("Cut off points and associated row reduction and loss of information\n by Ngram size")
+
+
+crush <- data.frame(1:4, c(10,10,10,30))
+x3 <- lapply(1:4, function(n) {
+  filter(x3[[crush[n,1]]], Freq >=crush[n,2])
+})
+
+
+```
+
+
+```{r}
+pattern <- "all i want"
+phrase <- corpus_clean(pattern)
+
+Ngram_case <- sapply(gregexpr("\\W+", phrase), length) + 1
+words <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
+
+insert_blank <- function(x , words, row = 1){
+  t <- lapply(1:Ngram_case, function(n) {
+  if(words[row,n] =="[blank]"){rep("[blank]", nrow(x) )} else{word(x$predictor, n)}
+  })
+
+pred_acc
+```
+
+
+Test gap model
+```{r}
+y <- sapply(pred_acc$predictor, function(n) {
+  
+  result_test(n, x3)
+})
+pred_acc <- cbind(pred_acc, result_gap = do.call(rbind, y))
+
+with(pred_acc, sum((dependent == result_gap)*Freq, na.rm = TRUE)/sum(Freq))
+```
+
