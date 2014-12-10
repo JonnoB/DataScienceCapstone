@@ -1,0 +1,41 @@
+Capstone Presentation
+========================================================
+author: Jonathan Bourne
+date: 09/12/14
+
+Introduction
+========================================================
+
+Description of the Algorithm
+
+The prediction algorithm, is a list of Ngram dataframes. When the target phrase is entered each Ngram dataframe is filtered to only relevant responses. All responses are then combined into a single dataframe and ranked according to Ngram with a tie braker on predictive power, the highest ranked result is then returned.
+
+Description of the App
+
+The app is simply the practical application of the algorithm it allows the phrase to be entered on the left side panel, then returns the suggested response, the the entire phrase with prediction, and any alternative options (in the form of a table)
+
+Dealing with Large Datasets
+========================================================
+
+My initial problem was the size of the datasets, my first method worked well on 1% of the dataset but ran out of memory when I tried to scale up. I solved this in several ways, eventually able to use my target size of 80% oof the data set.
+
+- Breaking each data set into 10% chunks that would then be 10% again using nested lapply functions
+- Avoiding the table function and converting to a data frame then summarising with dplyr
+- Nesting functions that could be tested and improved individually to keep things simple
+
+Testing predictive power
+========================================================
+
+In order to test the predictive power of the model, I used a held out 10% test set and created a dataframe of 5grams, splitting of the last word then using the model to predict with. The model it turns out is rather slow so I could only use a sub sample of the 5grams I bootstrapped a representative subsample weighting by the frequency of the 5 grams and calculated the % correct values. The result of the Ngram test model also revealed that removing the stop words wasn't a good idea as most Ngrams have a stop word as a predictor. the alternative of having both dictionaries is too big so only the with stop words dictionary was used
+
+Conclusion
+========================================================
+
+This project was extremely challenging especially as NLP is a new area. However it has definitely been a strong learning experience that has been beneficial. I used a lot of time on code and concepts which were then discarded, although, some alternative dev is necessary I could have saved time by haveing a clearer plan of vision. specifically I have learnt a lot about.
+
+- Dealing with memory constraints
+- Testing methods
+- Much better use of custom functions
+- More abstract methods of interpolation
+
+Overall the Data science specialisation has been a fantastic experience and I have really progressed in R programming, statistics, and data science consepts
