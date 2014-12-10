@@ -5,7 +5,13 @@ date: "Monday, December 08, 2014"
 output: html_document
 ---
 
+```{r}
+library(reshape2)
+```
 
+
+
+Function to replace words with "[blank]" where required.
 ```{r}
 insert_blank <- function(x , words, row = 1){
 
@@ -29,35 +35,49 @@ x <- group_by(x, predictor ) %>%
       filter(min_rank(desc(Prob)) == 1) }
 ```
 
+function that shows how data can be reduced compressed for a certain loss of data
+```{r}
+reducer <- function(Ngram, max_cut_off = 50) {
+ 
+  reduce <- sapply(1:max_cut_off, function(n){
+  Ngram2 <-Ngram[Ngram$Freq >=n,]
+  c(n,nrow(Ngram2)/nrow(Ngram),sum(Ngram2$Freq)/sum(Ngram$Freq))
+})  
+reduce <- data.frame(t(reduce)) 
+names(reduce) <- c("cut_off","length_reduction", "Loss_of_information")  
+reduce <-melt(data = reduce, id.vars ="cut_off")
+}
+```
+
 
 
 ```{r}
 
 words <- data.frame(one = rep("x1",8), two = rep(c("x2","[blank]"), 1, each = 4), three = rep(c("x3","[blank]"), 2, each = 2), four = rep(c("x4","[blank]"), 4), stringsAsFactors = FALSE)
 
-x <- ngram_probs[[3]]
- 
-Ngram_case <- mean(x$Ngrams)-1
-words <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
+Ngram4 <- ngram_probs[[3]]
+Ngram_case <- mean(Ngram4$Ngrams)-1
+words2 <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
+Ngram4_blank <- insert_blank(Ngram4, words2, 4)
+Ngram4_blank$predictor <- word(Ngram4_blank$predictor, 1) 
+Ngram4_blank$Ngrams <- 2.5
 
+Ngram3 <- ngram_probs[[2]]
+Ngram_case <- mean(Ngram3$Ngrams)-1
+words2 <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
+Ngram3_blank <- insert_blank(Ngram3, words2, 2)
+Ngram3_blank$predictor <- word(Ngram3_blank$predictor, 1)
+Ngram3_blank$Ngrams <- 1.5
 
-x2 <- insert_blank(x, words, 4)
+ngram_probs_blank <- list(if_in_doubt,Ngram3_blank, Ngram4_blank)
+save(ngram_probs_blank, file = "ngram_probs_blank.Rda")
 
+reduce <- reducer(Ngram3_blank)
+reduce2 <- reducer(Ngram4_blank)
 
-x3 <- lapply(1:nrow(words), function(y) {
-    insert_blank(x, words, y)
-  
-})
+ggplot(reduce2, aes( x= cut_off, y = value, colour = variable)) + geom_line()
 
-
-
-
-reduce2 <- sapply(1:30, function(n){
-  x2 <-x2[x2$Freq >=n,]
-  c(n,nrow(x2)/nrow(x),sum(x2$Freq)/sum(x$Freq))
-})  
-reduce2 <- data.frame(t(reduce2))
-
+blanks <- as.list(Ngram3_blank, Ngram4_blank)
 ```
 
 
@@ -94,15 +114,35 @@ x3 <- lapply(1:4, function(n) {
 pattern <- "all i want"
 phrase <- corpus_clean(pattern)
 
+c(paste(word(phrase, -2), "[blank]"),paste(word(phrase, -3), "[blank] [blank]"))
+
 Ngram_case <- sapply(gregexpr("\\W+", phrase), length) + 1
 words <- words[!duplicated(words[,1:Ngram_case]),1:Ngram_case]
 
-insert_blank <- function(x , words, row = 1){
-  t <- lapply(1:Ngram_case, function(n) {
-  if(words[row,n] =="[blank]"){rep("[blank]", nrow(x) )} else{word(x$predictor, n)}
-  })
+result_blank(phrase, ngram_probs_blank)
 
 pred_acc
+```
+
+
+A function designed to produce results from the blank data
+```{r}
+result_blank <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  
+  wordcount <- if(length(ngram_probs) < str_count(phrase, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(phrase, "\\S+")}
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]] | predictor == "[blank]"))
+  results <- rbind_all(results)
+  results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results
+  }
+
 ```
 
 

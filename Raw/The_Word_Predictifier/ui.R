@@ -21,7 +21,9 @@ shinyUI(fluidPage(
       p("It then compares the cleaned phrases to two similarly cleaned dictionaries of", a("ngrams", href= "http://en.wikipedia.org/wiki/N-gram")),
       p("matching ngrams a compiled then sorted according to Ngram length tie then ordering on length probability,
           Thisis becuase although a lower Ngram has may have a higher probability it lacks context.
-          Finally the resulting most likely ngram is then returned. For more information click", a("here", href =""))
+          Finally the resulting most likely ngram is then returned. For more information click", 
+        a("here", href ="https://rpubs.com/JonnoB/47443"), 
+        "to see an Rpub presentation")
     ),
     
     mainPanel(

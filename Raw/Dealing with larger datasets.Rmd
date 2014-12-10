@@ -396,6 +396,19 @@ load("ngram_probs_small.Rda")
 ```
 
 
+##The single most common word
+
+```{r}
+Ngram1 <- Ngram1 %>%
+  arrange(desc(Freq)) %>%
+  mutate( predictor = "[blank]" ,Prob = Freq/sum(Freq), dependent = pattern)
+
+if_in_doubt <- Ngram1[1,]
+```
+
+
+
+##Creating and output
 
 ```{r}
 result <- function(phrase, ngram_probs) { 
@@ -438,8 +451,9 @@ pattern <- "yum enjoy your"
 phrase <- corpus_clean(pattern)
 phrase_stop <- corpus_clean_stop(pattern)
 
-rbind(result(phrase_stop, ngram_probs_stop), result(phrase, ngram_probs))
-result(phrase_stop, ngram_probs_stop)
+    results <- rbind(result_blank(phrase, ngram_probs_blank), result(phrase, ngram_probs)) %>%
+      arrange( desc(Ngrams), desc(Prob))
+
 ```
 
 
