@@ -1,12 +1,12 @@
 library(shiny)
 
-
 options(shiny.maxRequestSize = 15*1024^2)
-packages <- c("R.utils", "tm", "dplyr", "stringr", "xtable")
-invisible(lapply(packages, library, character.only = TRUE))
+#packages <- c("R.utils", "tm", "dplyr", "stringr", "xtable") #
+#invisible(lapply(packages, library, character.only = TRUE))
+library(R.utils);library(tm); library(dplyr);library(stringr)
 
 #load("data/ngram_probs_stop.Rda")
-load("./data/ngramprobssmall.Rda")
+load("data/ngramprobssmall.Rda")
 
 corpus_clean<- function(x) {
   x <- tolower(x)
