@@ -1,0 +1,182 @@
+---
+title: "minimising and testing the data"
+author: "Jonathan Bourne"
+date: "Wednesday, December 10, 2014"
+output: html_document
+---
+
+```{r}
+packages <- c("R.utils", "tm", "dplyr", "stringr", "xtable", "ggplot2", "reshape2")
+invisible(lapply(packages, require, character.only = TRUE))
+```
+
+
+```{r}
+setwd("~/R/DataScienceCapstone")
+base <- getwd()
+setwd("./Data/Raw/final/en_US")
+```
+
+load the data
+creating the probability tables
+```{r, eval=FALSE}
+load("ngram_probs.Rda")
+load("if_in_doubt.Rda")
+load("ngram_probs_blank.Rda")
+load("Test.Rda")
+```
+
+##compressing the probability dataframes lists smaller
+
+The Ngram lists are very large when first produced the full Nragm with stops is easily over 100Mb, in order to reduce the size to make searching and loading to shiny reasonable there needs to be a trade off between loss of information and size reduction.
+```{r}
+reduce <- lapply(ngram_probs, function(x){
+  reduce <- sapply(1:30, function(n){
+  x2 <-x[x$Freq >=n,]
+  c(n,nrow(x2)/nrow(x),sum(x2$Freq)/sum(x$Freq))
+})
+
+data.frame(t(reduce))
+})
+
+red <- rbind_all(reduce)
+
+red <- cbind( red, rep(c(2,3,4), each = 30))
+names(red) <- c("cut_off","length_reduction", "Loss_of_information", "Ngram")
+red <-melt(data = red, id.vars =c("cut_off", "Ngram"))
+
+ggplot(red, aes( x= cut_off, y = value, colour = variable)) + geom_line()+facet_grid(~Ngram) +
+  ggtitle ("Cut off points and associated row reduction and loss of information\n by Ngram size")
+
+```
+
+
+As a result of the above analysis and graph it seems reasonble to reduce the size of the ngram lists by a certain amount to make the search process quicker and also that the dictionaries can be laoded up to the shiny server.
+
+the cuts off will be as follows
+
+- Ngram2 cut off 30
+- Ngram3 cut off 20
+- Ngram4 cut off 10
+
+
+```{r}
+crush <- data.frame(1:3, c(30,20,10))
+ngram_probs_small <- lapply(1:3, function(n) {
+  filter(ngram_probs[[crush[n,1]]], Freq >=crush[n,2])
+})
+save(ngram_probs_small, file = "ngram_probs_small.Rda")
+
+```
+
+
+##Creating an output
+
+```{r}
+result <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  
+  wordcount <- if(length(ngram_probs) < str_count(phrase, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(phrase, "\\S+")}
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n, -1))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results
+  }
+```
+
+```{r}
+result_blank <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  
+  wordcount <- if(length(ngram_probs) < str_count(phrase, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(phrase, "\\S+")}
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]] | predictor == "[blank]"))
+  results <- rbind_all(results)
+  results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results
+  }
+```
+
+
+```{r}
+result_test <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  wordcount <- length(ngram_probs)
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n, -1))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]]))
+results <- rbind_all(results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results[1,5]
+  }
+```
+
+```{r}
+corpus_clean<- function(x) {
+x <- tolower(x)
+x <- gsub("&", "and", x)
+x <- gsub("p m|p.m", "pm", x)
+x <- gsub("'ll", " will", x)
+x <- gsub("'d", " would", x)
+x <- gsub("'m", " am", x)
+x <- gsub("'ve", " have", x)
+x <- gsub("'re", " are", x)
+x <- gsub("can't|cannot|cant", "can not", x)
+x <- gsub("n't", " not", x)
+x <- gsub("'s", "", x)
+x <- removeNumbers(x)
+x <- removePunctuation(x)
+x <- gsub(" will", "''ll", x)
+x <- gsub(" would", "'d", x)
+x <- gsub(" am", "'m", x)
+x <- gsub(" have", "'ve", x)
+x <- gsub(" are", "'re", x)
+x <- gsub("cannot", "can't", x)
+x <- gsub(" not", "n't", x)
+x <- stripWhitespace(x)
+  }
+```
+
+
+#Testing the Ngram model
+
+```{r} 
+pattern <- "yum enjoy your"
+
+phrase <- corpus_clean(pattern)
+
+    results <- rbind(result_blank(phrase, ngram_probs_blank), result(phrase, ngram_probs)) %>%
+      arrange( desc(Ngrams), desc(Prob))
+
+```
+
+
+testing a sample of Ngrams to see the accuracy
+```{r}
+pred_acc <- sample_n(Test, size = 100, replace = TRUE, weight = Freq)
+
+y <- sapply(pred_acc$predictor, function(n) {
+  
+  result_test(n, ngram_probs2)
+})
+pred_acc <- cbind(pred_acc, result = do.call(rbind, y))
+
+with(pred_acc, sum((dependent == result)*Freq, na.rm = TRUE)/sum(Freq))
+
+save(pred_acc, file = "predictive_accuracy.Rda")
+
+sum(pred_acc$Freq)/sum(Test$Freq) #percent of total tested
+```

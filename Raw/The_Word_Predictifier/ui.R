@@ -19,11 +19,11 @@ shinyUI(fluidPage(
         The second method does the same and in addition removes all", 
         a("Stop words.", href = "http://en.wikipedia.org/wiki/Stop_words")),
       p("It then compares the cleaned phrases to two similarly cleaned dictionaries of", a("ngrams", href= "http://en.wikipedia.org/wiki/N-gram")),
-      p("matching ngrams a compiled then sorted according to Ngram length tie then ordering on length probability,
+      p("Matching ngrams a compiled then sorted according to Ngram length tie then ordering on length probability,
           Thisis becuase although a lower Ngram has may have a higher probability it lacks context.
           Finally the resulting most likely ngram is then returned. For more information click", 
         a("here", href ="https://rpubs.com/JonnoB/47443"), 
-        "to see an Rpub presentation")
+        "to see an Rpub presentation.")
     ),
     
     mainPanel(
