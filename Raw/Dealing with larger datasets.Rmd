@@ -344,6 +344,58 @@ save(list=ls(pattern = "blogs_.*|twitter_.*|news_.*"), file = "data_stop.Rda"  )
 rm(list = ls(pattern = "blogs_|twitter_|news_"))
 ```
 
+
+creating the probability tables
+```{r, eval=FALSE}
+load("ngram_probs_stop.Rda")
+load("ngram_probs.Rda")
+```
+
+##make the probs lists smaller
+
+The Ngram lists are very large when first produced the full Nragm with stops is easily over 100Mb, in order to reduce the size to make searching and loading to shiny reasonable there needs to be a trade off between loss of information and size reduction.
+```{r}
+reduce <- lapply(ngram_probs, function(x){
+  reduce <- sapply(1:30, function(n){
+  x2 <-x[x$Freq >=n,]
+  c(n,nrow(x2)/nrow(x),sum(x2$Freq)/sum(x$Freq))
+})
+
+data.frame(t(reduce))
+})
+
+red <- rbind_all(reduce)
+
+red <- cbind( red, rep(c(2,3,4), each = 30))
+names(red) <- c("cut_off","length_reduction", "Loss_of_information", "Ngram")
+red <-melt(data = red, id.vars =c("cut_off", "Ngram"))
+
+ggplot(red, aes( x= cut_off, y = value, colour = variable)) + geom_line()+facet_grid(~Ngram) +
+  ggtitle ("Cut off points and associated row reduction and loss of information\n by Ngram size")
+
+```
+
+
+As a result of the above analysis and graph it seems reasonble to reduce the size of the ngram lists by a certain amount to make the search process quicker and also that the dictionaries can be laoded up to the shiny server.
+
+the cuts off will be as follows
+
+- Ngram2 cut off 30
+- Ngram3 cut off 20
+- Ngram4 cut off 10
+
+
+```{r}
+crush <- data.frame(1:3, c(30,20,10))
+ngram_probs_small <- lapply(1:3, function(n) {
+  filter(ngram_probs[[crush[n,1]]], Freq >=crush[n,2])
+})
+save(ngram_probs_small, file = "ngram_probs_small.Rda")
+saveRDS(ngram_probs_small, file = "ngramsmall.RDS")
+load("ngram_probs_small.Rda")
+```
+
+
 ##The single most common word
 
 ```{r}
@@ -352,10 +404,75 @@ Ngram1 <- Ngram1 %>%
   mutate( predictor = "[blank]" ,Prob = Freq/sum(Freq), dependent = pattern)
 
 if_in_doubt <- Ngram1[1,]
-save(if_in_doubt, file = "if_in_doubt.Rda")
 ```
 
 
+
+##Creating and output
+
+```{r}
+result <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  
+  wordcount <- if(length(ngram_probs) < str_count(phrase, "\\S+")) {
+  length(ngram_probs)
+  } else  {str_count(phrase, "\\S+")}
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n, -1))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]]))
+results <- do.call(rbind.data.frame, results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results
+  }
+```
+
+```{r}
+result_test <- function(phrase, ngram_probs) { 
+  phrase <- str_trim(phrase, side = "both")
+  wordcount <- length(ngram_probs)
+  
+  forNgrams <- sapply(1:wordcount, function(n) word(phrase, -n, -1))
+  results <-lapply(1:wordcount, function(n) filter(ngram_probs[[n]], 
+                                                    predictor == forNgrams[[n]]))
+results <- rbind_all(results)
+results <- ungroup(results) %>%
+  arrange( desc(Prob), desc(Ngrams))
+  results[1,5]
+  }
+```
+
+
+testing the Ngram model
+```{r} 
+pattern <- "yum enjoy your"
+
+phrase <- corpus_clean(pattern)
+phrase_stop <- corpus_clean_stop(pattern)
+
+    results <- rbind(result_blank(phrase, ngram_probs_blank), result(phrase, ngram_probs)) %>%
+      arrange( desc(Ngrams), desc(Prob))
+
+```
+
+
+testing a sample of Ngrams to see the accuracy
+```{r}
+pred_acc <- sample_n(Test, size = 100, replace = TRUE, weight = Freq)
+
+y <- sapply(pred_acc$predictor, function(n) {
+  
+  result_test(n, ngram_probs2)
+})
+pred_acc <- cbind(pred_acc, result = do.call(rbind, y))
+
+with(pred_acc, sum((dependent == result)*Freq, na.rm = TRUE)/sum(Freq))
+
+save(pred_acc, file = "predictive_accuracy.Rda")
+
+sum(pred_acc$Freq)/sum(Test$Freq) #percent of total tested
+```
 
 
 The dplyr enhanced version that avoids the table function is faster. it is also much smaller as it doesn't have a huge list of factors only characters
