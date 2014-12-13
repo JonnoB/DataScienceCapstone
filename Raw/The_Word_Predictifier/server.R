@@ -5,8 +5,8 @@ options(shiny.maxRequestSize = 15*1024^2)
 #invisible(lapply(packages, library, character.only = TRUE))
 library(R.utils);library(tm); library(dplyr);library(stringr)
 
-load("data/ngram_probs_blank.Rda")
-load("data/ngramprobssmall.Rda")
+load("data/ngram_probs_blank_small.Rda")
+load("data/ngram_probs_small.Rda")
 
 corpus_clean<- function(x) {
   x <- tolower(x)
@@ -70,8 +70,7 @@ shinyServer(function(input, output) {
   output$phrase1 <- renderText({
     phrase <- corpus_clean(input$phrase)
  
-#     results <- result(phrase, ngram_probs_small)
-    results <- rbind(result_blank(phrase, ngram_probs_blank), 
+    results <- rbind(result_blank(phrase, ngram_probs_blank_small), 
                      result(phrase, ngram_probs_small)) %>%
       arrange( desc(Ngrams), desc(Prob))
     results <- toupper(as.character(results$dependent[1]))
@@ -79,7 +78,7 @@ shinyServer(function(input, output) {
   output$phrase2 <- renderText({
     phrase <- corpus_clean(input$phrase)
     
-    results <- rbind(result_blank(phrase, ngram_probs_blank), 
+    results <- rbind(result_blank(phrase, ngram_probs_blank_small), 
                      result(phrase, ngram_probs_small)) %>%
       arrange( desc(Ngrams), desc(Prob))
     results <- as.character(results$dependent[1])
@@ -87,7 +86,7 @@ shinyServer(function(input, output) {
   })
   output$view <- renderTable({ 
     phrase <- corpus_clean(input$phrase)
-    results <- rbind(result_blank(phrase, ngram_probs_blank), 
+    results <- rbind(result_blank(phrase, ngram_probs_blank_small), 
                      result(phrase, ngram_probs_small)) %>%
       arrange( desc(Ngrams), desc(Prob))
     as.data.frame(results) #some sort of dplyr tablerender bug means that as.data.frame needs to be called.

@@ -35,7 +35,7 @@ x <- group_by(x, predictor ) %>%
       filter(min_rank(desc(Prob)) == 1) }
 ```
 
-function that shows how data can be reduced compressed for a certain loss of data
+function that shows how data can be reduced compressed for a given loss of information
 ```{r}
 reducer <- function(Ngram, max_cut_off = 50) {
  
